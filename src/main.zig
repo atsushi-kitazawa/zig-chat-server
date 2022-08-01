@@ -1,17 +1,32 @@
 const std = @import("std");
 const log = std.log;
 const net = std.net;
+const testing = std.testing;
 const expect = std.testing.expect;
 
-const Chat = struct {
-    channel: []const u8,
-    member: [][]const u8,
+const ArrayList = std.ArrayList;
+const list_allocator = std.testing.allocator;
 
-    pub fn init(channel: []const u8, member: [][]const u8) Chat {
+const Chat = struct {
+    member: ArrayList(net.StreamServer.Connection),
+
+    pub fn init() Chat {
+        var list = ArrayList(net.StreamServer.Connection).init(list_allocator);
         return Chat{
-            .channel = channel,
-            .member = member,
+            .member = list,
         };
+    }
+
+    pub fn addClient(self: *Chat, conn: net.StreamServer.Connection) anyerror!void {
+        try self.member.append(conn);
+    }
+
+    pub fn removeClient(self: *Chat, conn: net.StreamServer.Connection) anyerror!void {}
+
+    pub fn broadcast() void {}
+
+    pub fn deinit(self: *Chat) void {
+        defer self.member.deinit();
     }
 };
 
@@ -22,17 +37,28 @@ pub fn main() anyerror!void {
 }
 
 pub fn doMain() anyerror!void {
+    // init server
     const address = net.Address.initIp4([4]u8{ 127, 0, 0, 1 }, 8888);
     var server = net.StreamServer.init(.{ .reuse_address = true });
     try server.listen(address);
+
+    // create chat struct
+    var chat = Chat.init();
 
     while (true) {
         const connection = try server.accept();
         log.info("accept client = {}", .{connection.address});
 
+        try chat.addClient(connection);
+
         var thread = try std.Thread.spawn(.{}, process, .{@as(net.StreamServer.Connection, connection)});
         _ = thread;
+
+        log.debug("chat = {}", .{chat});
     }
+
+    // destroy chat
+    chat.deinit();
 }
 
 pub fn process(conn: net.StreamServer.Connection) anyerror!void {
@@ -76,8 +102,8 @@ test "difine function" {
 
 test "test struct" {
     // var members = [_][]const u8{"user1", "user2", "user3"};
-    // var c1 = Chat.init("chan1", &members);
-    // std.log.info("{}", .{c1});
+    // var c1 = Chat.init(&members);
+    // log.debug("{}", .{c1});
 }
 
 test "if u8 slice" {
