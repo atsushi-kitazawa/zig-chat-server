@@ -29,7 +29,9 @@ pub fn doMain() anyerror!void {
     while (true) {
         const connection = try server.accept();
         log.info("accept client = {}", .{connection.address});
-        try process(connection);
+
+        var thread = try std.Thread.spawn(.{}, process, .{@as(net.StreamServer.Connection, connection)});
+        _ = thread;
     }
 }
 
@@ -45,7 +47,7 @@ pub fn process(conn: net.StreamServer.Connection) anyerror!void {
         var msgSize = try conn.stream.read(buf[0..]);
         // remove \r\n
         var msg = buf[0 .. msgSize - 2];
-        log.info("client message = {s}, size = {d}", .{ msg, msgSize });
+        log.info("client = {}, msg = {s}, size = {d}", .{ conn.address, msg, msgSize });
 
         if (std.mem.eql(u8, msg, "/leave")) {
             log.info("leave client = {}", .{conn.address});
